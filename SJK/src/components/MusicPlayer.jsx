@@ -1,167 +1,187 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { Modal, List, Button } from "antd";
+import { UnorderedListOutlined } from "@ant-design/icons";
 
 export default function MusicPlayer() {
-
   const [songs, setSongs] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(null);
   const [playing, setPlaying] = useState(false);
+  const [playlistVisible, setPlaylistVisible] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   const audioRef = useRef(null);
   const inputRef = useRef(null);
+  const [audioURL, setAudioURL] = useState(null); // store URL once
 
-  const openFolder = () => {
-    inputRef.current.click();
-  };
+  const openFolder = () => inputRef.current.click();
 
   const handleFolder = (e) => {
     const files = Array.from(e.target.files);
-
-    const mp3Files = files.filter(file =>
+    const mp3Files = files.filter((file) =>
       file.name.toLowerCase().endsWith(".mp3")
     );
-
     setSongs(mp3Files);
     setCurrentIndex(null);
     setPlaying(false);
+    setProgress(0);
+    setAudioURL(null);
   };
 
   const playSong = (index) => {
     setCurrentIndex(index);
     setPlaying(true);
+    setPlaylistVisible(false);
+
+    const url = URL.createObjectURL(songs[index]);
+    setAudioURL(url);
+    setProgress(0);
+    setDuration(0);
 
     setTimeout(() => {
-      if (audioRef.current) audioRef.current.play();
+      if (audioRef.current) audioRef.current.play().catch(() => {});
     }, 0);
   };
 
   const playPause = () => {
-
     if (!audioRef.current) return;
-
-    if (playing) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play();
-    }
-
+    if (playing) audioRef.current.pause();
+    else audioRef.current.play();
     setPlaying(!playing);
   };
 
   const nextSong = () => {
     if (!songs.length) return;
-
     const next = (currentIndex + 1) % songs.length;
     playSong(next);
   };
 
   const prevSong = () => {
     if (!songs.length) return;
-
     const prev = (currentIndex - 1 + songs.length) % songs.length;
     playSong(prev);
   };
 
+  const handleTimeUpdate = () => {
+    if (audioRef.current) setProgress(audioRef.current.currentTime);
+  };
+
+  const handleSeek = (e) => {
+    if (audioRef.current) audioRef.current.currentTime = e.target.value;
+    setProgress(e.target.value);
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) setDuration(audioRef.current.duration);
+  };
+
   const currentSong = songs[currentIndex];
 
+  useEffect(() => {
+    if (audioRef.current && playing) audioRef.current.play().catch(() => {});
+  }, [audioURL, playing]);
+
   return (
-
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#2b0147] to-black text-white">
-
-      {/* hidden folder input */}
-      <input
-        ref={inputRef}
-        type="file"
-        webkitdirectory="true"
-        multiple
-        accept=".mp3"
-        style={{ display: "none" }}
-        onChange={handleFolder}
-      />
-
-      <div className="w-[360px] p-6 rounded-3xl bg-[#1a022e] shadow-2xl">
-
-        {/* Header */}
-        <div className="flex justify-between items-center text-gray-400 mb-6">
-          <button onClick={openFolder}>📁</button>
-          <p className="tracking-widest text-sm">NOW PLAYING</p>
-          <span>⋮</span>
-        </div>
-
-        {/* Album */}
-        <div className="bg-gray-200 rounded-2xl p-6 flex justify-center mb-6 shadow-lg">
-          <img
-            src="https://picsum.photos/300"
-            className="w-48 h-48 object-cover shadow-xl"
+    <div className="bg-black h-screen p-5 flex flex-col gap-3">
+      {/* Top */}
+      <div className=" h-[8%] flex justify-between px-5 items-center">
+        <div>
+          <Button size="large" type="primary" onClick={openFolder}>
+            Open Folder
+          </Button>
+          <input
+            type="file"
+            ref={inputRef}
+            style={{ display: "none" }}
+            multiple
+            webkitdirectory="true"
+            onChange={handleFolder}
           />
         </div>
 
-        {/* Song Info */}
-        {currentSong && (
-          <div className="text-center mb-4">
-            <h2 className="text-2xl font-bold truncate">
-              {currentSong.name}
-            </h2>
-            <p className="text-purple-400 text-sm">
-              Local Music
-            </p>
-          </div>
-        )}
-
-        {/* Audio */}
-        {currentSong && (
-          <audio
-            ref={audioRef}
-            src={URL.createObjectURL(currentSong)}
-            onEnded={nextSong}
-          />
-        )}
-
-        {/* Controls */}
-        <div className="flex justify-between items-center mb-6 text-gray-300">
-
-          <button>🔀</button>
-
-          <button onClick={prevSong}>⏮</button>
-
-          <button
-            onClick={playPause}
-            className="w-16 h-16 rounded-full bg-purple-600 flex items-center justify-center text-2xl shadow-lg shadow-purple-500/40"
+        <div>
+          <Button
+          size="large"
+            icon={<UnorderedListOutlined />}
+            onClick={() => setPlaylistVisible(true)}
           >
-            {playing ? "⏸" : "▶"}
-          </button>
-
-          <button onClick={nextSong}>⏭</button>
-
-          <button>🔁</button>
-
+            Playlist
+          </Button>
         </div>
-
-        {/* Playlist */}
-        <div className="max-h-40 overflow-y-auto text-sm">
-
-          {songs.map((song, index) => (
-
-            <div key={index}>
-
-              <button
-                onClick={() => playSong(index)}
-                className={`w-full text-left px-3 py-2 rounded ${
-                  currentIndex === index
-                    ? "bg-purple-700"
-                    : "hover:bg-white/10"
-                }`}
-              >
-                {song.name}
-              </button>
-
-            </div>
-
-          ))}
-
-        </div>
-
       </div>
 
+      {/* Middle */}
+      <div className=" h-[80%] flex flex-col justify-center items-center gap-5">
+        {currentSong ? (
+          <>
+            <div className="bg-linear-to-bl from-indigo-400 to-pink-400 h-[300px] w-[90%] rounded-xl mb-5">
+              box
+            </div>
+            {/* Song Title */}
+            <div className="text-white text-lg max-w-[250px] truncate text-center">
+              {currentSong.name}
+            </div>
+
+            {/* Progress Bar */}
+            <input
+              type="range"
+              min="0"
+              max={duration || 0}
+              value={progress}
+              onChange={handleSeek}
+              className="w-64"
+            />
+
+            {/* Audio */}
+            {audioURL && (
+              <audio
+                ref={audioRef}
+                src={audioURL}
+                onTimeUpdate={handleTimeUpdate}
+                onEnded={nextSong}
+                onLoadedMetadata={handleLoadedMetadata}
+              />
+            )}
+
+            {/* Controls */}
+            <div className="flex gap-5 mt-4">
+              <Button onClick={prevSong}>Prev</Button>
+              <Button onClick={playPause}>{playing ? "Pause" : "Play"}</Button>
+              <Button onClick={nextSong}>Next</Button>
+            </div>
+          </>
+        ) : (
+          <div className="text-white">Select a folder to load songs</div>
+        )}
+      </div>
+
+      {/* Bottom */}
+      <div className=" h-[12%] flex items-center justify-center text-white text-shadow-sm font-mono text-[12px] tracking-widest">
+        Enjoy music without aids
+      </div>
+
+      {/* Playlist */}
+      <Modal
+        title="Playlist"
+        open={playlistVisible}
+        onCancel={() => setPlaylistVisible(false)}
+        footer={null}
+      >
+        <List
+          dataSource={songs}
+          renderItem={(song, index) => (
+            <List.Item>
+              <Button
+                type="link"
+                onClick={() => playSong(index)}
+                className="max-w-[250px] truncate"
+              >
+                {song.name}
+              </Button>
+            </List.Item>
+          )}
+        />
+      </Modal>
     </div>
   );
 }
