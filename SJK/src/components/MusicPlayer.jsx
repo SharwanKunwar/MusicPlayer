@@ -24,6 +24,8 @@ export default function MusicPlayer() {
       file.name.toLowerCase().endsWith(".mp3")
     );
 
+    console.log(mp3Files);
+
     setSongs(mp3Files);
     setCurrentIndex(null);
     setPlaying(false);
