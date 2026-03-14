@@ -167,7 +167,8 @@ export default function MusicPlayer() {
         onCancel={() => setPlaylistVisible(false)}
         footer={null}
       >
-        <List
+        <div className="h-[600px] overflow-y-scroll">
+          <List
           dataSource={songs}
           renderItem={(song, index) => (
             <List.Item>
@@ -181,6 +182,7 @@ export default function MusicPlayer() {
             </List.Item>
           )}
         />
+        </div>
       </Modal>
     </div>
   );
