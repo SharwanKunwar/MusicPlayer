@@ -9,39 +9,58 @@ export default function MusicPlayer() {
   const [playlistVisible, setPlaylistVisible] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [gradientSpeed, setGradientSpeed] = useState(10); // dynamic speed
+  const [gradientSpeed, setGradientSpeed] = useState(10);
 
   const audioRef = useRef(null);
-  const inputRef = useRef(null);
-  const [audioURL, setAudioURL] = useState(null); // store URL once
+  const [folderHandle, setFolderHandle] = useState(null);
 
-  const openFolder = () => inputRef.current.click();
+  // Try to restore last folder on mount
+  useEffect(() => {
+    const lastFolder = localStorage.getItem("folderHandle");
+    if (lastFolder) {
+      // Just flag; user needs to re-grant permission
+      setFolderHandle(true);
+    }
+  }, []);
 
-  const handleFolder = (e) => {
-    const files = Array.from(e.target.files);
-    const mp3Files = files.filter((file) =>
-      file.name.toLowerCase().endsWith(".mp3")
-    );
-    setSongs(mp3Files);
+  const openFolder = async () => {
+    try {
+      const handle = await window.showDirectoryPicker();
+      setFolderHandle(handle);
+      localStorage.setItem("folderHandle", true); // flag to restore next time
+      loadSongsFromFolder(handle);
+    } catch (e) {
+      console.log("Folder selection cancelled");
+    }
+  };
+
+  const loadSongsFromFolder = async (handle) => {
+    const files = [];
+    for await (const entry of handle.values()) {
+      if (entry.kind === "file" && entry.name.toLowerCase().endsWith(".mp3")) {
+        files.push(entry);
+      }
+    }
+    setSongs(files);
     setCurrentIndex(null);
     setPlaying(false);
     setProgress(0);
-    setAudioURL(null);
   };
 
-  const playSong = (index) => {
+  const playSong = async (index) => {
     setCurrentIndex(index);
     setPlaying(true);
     setPlaylistVisible(false);
 
-    const url = URL.createObjectURL(songs[index]);
-    setAudioURL(url);
+    if (!songs[index]) return;
+    const file = await songs[index].getFile();
+    const url = URL.createObjectURL(file);
+    if (audioRef.current) {
+      audioRef.current.src = url;
+      audioRef.current.play().catch(() => {});
+    }
     setProgress(0);
     setDuration(0);
-
-    setTimeout(() => {
-      if (audioRef.current) audioRef.current.play().catch(() => {});
-    }, 0);
   };
 
   const playPause = () => {
@@ -78,7 +97,7 @@ export default function MusicPlayer() {
 
   const currentSong = songs[currentIndex];
 
-  // Gradient animation speed linked to audio amplitude
+  // Gradient animation linked to music
   useEffect(() => {
     if (!audioRef.current) return;
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -92,34 +111,21 @@ export default function MusicPlayer() {
     const tick = () => {
       analyser.getByteFrequencyData(dataArray);
       const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-      setGradientSpeed(5 + avg / 30); // faster when music is louder
+      setGradientSpeed(5 + avg / 30);
       requestAnimationFrame(tick);
     };
     tick();
-  }, [audioURL]);
-
-  useEffect(() => {
-    if (audioRef.current && playing) audioRef.current.play().catch(() => {});
-  }, [audioURL, playing]);
+  }, []);
 
   return (
     <div className="bg-black h-screen p-5 flex flex-col gap-3">
       {/* Top */}
-      <div className=" h-[8%] flex justify-between px-5 items-center">
+      <div className="h-[8%] flex justify-between px-5 items-center">
         <div>
           <Button size="large" type="primary" onClick={openFolder}>
             Open Folder
           </Button>
-          <input
-            type="file"
-            ref={inputRef}
-            style={{ display: "none" }}
-            multiple
-            webkitdirectory="true"
-            onChange={handleFolder}
-          />
         </div>
-
         <div>
           <Button
             size="large"
@@ -132,8 +138,15 @@ export default function MusicPlayer() {
       </div>
 
       {/* Middle */}
-      <div className=" h-[80%] flex flex-col justify-center items-center gap-5 w-full">
-        {currentSong ? (
+      <div className="h-[80%] flex flex-col justify-center items-center gap-5 w-full">
+        {songs.length === 0 ? (
+          <div className="text-white text-center">
+            <p>No folder selected.</p>
+            <Button type="primary" onClick={openFolder}>
+              Click here to select or restore folder
+            </Button>
+          </div>
+        ) : currentSong ? (
           <>
             {/* Animated Gradient Box */}
             <div
@@ -169,15 +182,12 @@ export default function MusicPlayer() {
             />
 
             {/* Audio */}
-            {audioURL && (
-              <audio
-                ref={audioRef}
-                src={audioURL}
-                onTimeUpdate={handleTimeUpdate}
-                onEnded={nextSong}
-                onLoadedMetadata={handleLoadedMetadata}
-              />
-            )}
+            <audio
+              ref={audioRef}
+              onTimeUpdate={handleTimeUpdate}
+              onEnded={nextSong}
+              onLoadedMetadata={handleLoadedMetadata}
+            />
 
             {/* Controls */}
             <div className="flex gap-5 mt-4">
@@ -187,12 +197,12 @@ export default function MusicPlayer() {
             </div>
           </>
         ) : (
-          <div className="text-white">Select a folder to load songs</div>
+          <div className="text-white">Select a song to play</div>
         )}
       </div>
 
       {/* Bottom */}
-      <div className=" h-[12%] flex items-center justify-center text-white text-shadow-sm font-mono text-[12px] tracking-widest">
+      <div className="h-[12%] flex items-center justify-center text-white text-shadow-sm font-mono text-[12px] tracking-widest">
         Enjoy music without aids
       </div>
 
