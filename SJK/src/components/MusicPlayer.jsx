@@ -9,6 +9,7 @@ export default function MusicPlayer() {
   const [playlistVisible, setPlaylistVisible] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [gradientSpeed, setGradientSpeed] = useState(10); // dynamic speed
 
   const audioRef = useRef(null);
   const inputRef = useRef(null);
@@ -77,6 +78,26 @@ export default function MusicPlayer() {
 
   const currentSong = songs[currentIndex];
 
+  // Gradient animation speed linked to audio amplitude
+  useEffect(() => {
+    if (!audioRef.current) return;
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = audioCtx.createAnalyser();
+    const source = audioCtx.createMediaElementSource(audioRef.current);
+    source.connect(analyser);
+    analyser.connect(audioCtx.destination);
+    analyser.fftSize = 256;
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+    const tick = () => {
+      analyser.getByteFrequencyData(dataArray);
+      const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+      setGradientSpeed(5 + avg / 30); // faster when music is louder
+      requestAnimationFrame(tick);
+    };
+    tick();
+  }, [audioURL]);
+
   useEffect(() => {
     if (audioRef.current && playing) audioRef.current.play().catch(() => {});
   }, [audioURL, playing]);
@@ -101,7 +122,7 @@ export default function MusicPlayer() {
 
         <div>
           <Button
-          size="large"
+            size="large"
             icon={<UnorderedListOutlined />}
             onClick={() => setPlaylistVisible(true)}
           >
@@ -111,12 +132,27 @@ export default function MusicPlayer() {
       </div>
 
       {/* Middle */}
-      <div className=" h-[80%] flex flex-col justify-center items-center gap-5">
+      <div className=" h-[80%] flex flex-col justify-center items-center gap-5 w-full">
         {currentSong ? (
           <>
-            <div className="bg-linear-to-bl from-indigo-400 to-pink-400 h-[300px] w-[90%] rounded-xl mb-5">
-              box
-            </div>
+            {/* Animated Gradient Box */}
+            <div
+              className="h-[300px] w-[90%] rounded-xl mb-5"
+              style={{
+                background: `linear-gradient(270deg, #6366f1, #ec4899, #6366f1)`,
+                backgroundSize: "600% 600%",
+                animation: `gradientMove ${gradientSpeed}s ease infinite`,
+              }}
+            ></div>
+
+            <style>{`
+              @keyframes gradientMove {
+                0% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
+                100% { background-position: 0% 50%; }
+              }
+            `}</style>
+
             {/* Song Title */}
             <div className="text-white text-lg max-w-[250px] truncate text-center">
               {currentSong.name}
@@ -169,19 +205,19 @@ export default function MusicPlayer() {
       >
         <div className="h-[600px] overflow-y-scroll">
           <List
-          dataSource={songs}
-          renderItem={(song, index) => (
-            <List.Item>
-              <Button
-                type="link"
-                onClick={() => playSong(index)}
-                className="max-w-[250px] truncate"
-              >
-                {song.name}
-              </Button>
-            </List.Item>
-          )}
-        />
+            dataSource={songs}
+            renderItem={(song, index) => (
+              <List.Item>
+                <Button
+                  type="link"
+                  onClick={() => playSong(index)}
+                  className="max-w-[250px] truncate"
+                >
+                  {song.name}
+                </Button>
+              </List.Item>
+            )}
+          />
         </div>
       </Modal>
     </div>
